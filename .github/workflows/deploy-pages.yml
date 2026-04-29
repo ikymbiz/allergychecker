@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_ZIP: allergy-checker-indexeddb-fastcheck.zip
+  SOURCE_ZIP: allergy-checker-indexeddb-fastcheck-fixed.zip
 
 jobs:
   deploy:
@@ -30,6 +30,7 @@ jobs:
       - name: Find source zip
         shell: bash
         run: |
+          set -euo pipefail
           if [ ! -f "$SOURCE_ZIP" ]; then
             echo "Missing $SOURCE_ZIP"
             echo "Repository root files:"
@@ -40,24 +41,49 @@ jobs:
       - name: Unzip source
         shell: bash
         run: |
+          set -euo pipefail
           rm -rf src dist
           mkdir -p src dist
           unzip -q "$SOURCE_ZIP" -d src
-          ROOT="src"
-          if [ -d "src/allergy-checker-indexeddb" ]; then
-            ROOT="src/allergy-checker-indexeddb"
+
+          PUBLIC_DIR="$(find src -type d -name public-app -print -quit)"
+          if [ -z "$PUBLIC_DIR" ]; then
+            echo "public-app directory was not found after unzip."
+            echo "Unzipped directories:"
+            find src -maxdepth 4 -type d | sort
+            exit 1
           fi
+
+          ROOT="$(dirname "$PUBLIC_DIR")"
+          echo "Detected app root: $ROOT"
           echo "APP_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+          if [ ! -d "$ROOT/admin-app" ]; then
+            echo "admin-app directory was not found under $ROOT"
+            find "$ROOT" -maxdepth 3 -type d | sort
+            exit 1
+          fi
+
+          if [ ! -d "$ROOT/shared/assets" ]; then
+            echo "shared/assets directory was not found under $ROOT"
+            find "$ROOT" -maxdepth 4 -type d | sort
+            exit 1
+          fi
 
       - name: Build static site
         shell: bash
         run: |
-          cp -R "$APP_ROOT/public-app/." dist/
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+
+          cp -a "$APP_ROOT/public-app/." dist/
           mkdir -p dist/admin
-          cp -R "$APP_ROOT/admin-app/." dist/admin/
+          cp -a "$APP_ROOT/admin-app/." dist/admin/
           mkdir -p dist/assets
-          cp -R "$APP_ROOT/shared/assets/." dist/assets/
+          cp -a "$APP_ROOT/shared/assets/." dist/assets/
           touch dist/.nojekyll
+
           echo "Built files:"
           find dist -maxdepth 3 -type f | sort
 
