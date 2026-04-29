@@ -1,1 +1,74 @@
+name: Deploy Allergy Checker IndexedDB MVP to GitHub Pages
 
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  SOURCE_ZIP: allergy-checker-indexeddb-mvp.zip
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find source zip
+        shell: bash
+        run: |
+          if [ ! -f "$SOURCE_ZIP" ]; then
+            echo "Missing $SOURCE_ZIP"
+            echo "Repository root files:"
+            ls -la
+            exit 1
+          fi
+
+      - name: Unzip source
+        shell: bash
+        run: |
+          rm -rf src dist
+          mkdir -p src dist
+          unzip -q "$SOURCE_ZIP" -d src
+          ROOT="src"
+          if [ -d "src/allergy-checker-indexeddb-mvp" ]; then
+            ROOT="src/allergy-checker-indexeddb-mvp"
+          fi
+          echo "APP_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Build static site
+        shell: bash
+        run: |
+          cp -R "$APP_ROOT/public-app/." dist/
+          mkdir -p dist/admin
+          cp -R "$APP_ROOT/admin-app/." dist/admin/
+          mkdir -p dist/assets
+          cp -R "$APP_ROOT/shared/assets/." dist/assets/
+          touch dist/.nojekyll
+          echo "Built files:"
+          find dist -maxdepth 3 -type f | sort
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
