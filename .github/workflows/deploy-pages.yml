@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_ZIP: allergy-checker-indexeddb.zip
+  SOURCE_ZIP: allergy-checker-indexeddb-fastcheck.zip
 
 jobs:
   deploy:
